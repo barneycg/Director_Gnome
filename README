@@ -1,0 +1,5 @@
+LAWN Alliance's Director Gnome broadcasting Bot.
+
+Uses JAXL v3 : https://github.com/abhinavsingh/JAXL/tree/v3.x
+
+Configure authentication using dg.ini example given in dg_example.ini
