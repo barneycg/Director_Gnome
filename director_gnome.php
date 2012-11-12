@@ -3,7 +3,7 @@
 /**
  * Director Gnome
  *
- * Copyright (c) 2012-2012, Barney Garretti.
+ * Copyright (c) 2012-2012, Barney Garrett.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -18,7 +18,7 @@
  * the documentation and/or other materials provided with the
  * distribution.
  *
- * * Neither the name of Abhinav Singh nor the names of his
+ * * Neither the name of Barney Garrett nor the names of his
  * contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
  *
