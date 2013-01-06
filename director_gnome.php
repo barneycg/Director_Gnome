@@ -45,19 +45,21 @@ $config = parse_ini_file("dg.ini", true);
 // initialize JAXL object with initial config
 
 require_once './JAXL/jaxl.php';
+
 $client = new JAXL(array(
 	'jid' => $config['authentication']['jid'],
 	'pass' => $config['authentication']['password'],
+	'priv_dir' => './JAXL/.jaxl',
 	'resource' => 'Director Gnome',
 	'auth_type' => 'DIGEST-MD5',
+	'log_level' => JAXL_INFO,
+	'log_path' => '/var/log/jaxl.log',
+	'strict'=>FALSE	
 ));
 
-// callback functions
+$client->manage_subscribe = "mutual";
 
-//$client->add_cb('on_roster_update', function() {
-	//global $client;
-	//print_r($client->roster);
-//});
+// callback functions
 
 $client->add_cb('on_auth_success', function() {
 	global $client;
@@ -65,9 +67,6 @@ $client->add_cb('on_auth_success', function() {
 
 	// set status
 	$client->set_status("available!", "Online", 10);
-
-	// fetch vcard
-	//$client->get_vcard();
 
 	// fetch roster list
 	$client->get_roster();
