@@ -3,7 +3,7 @@
 /**
  * Director Gnome
  *
- * Copyright (c) 2012-2012, Barney Garrett.
+ * Copyright (c) 2012-2013, Barney Garrett.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -94,20 +94,29 @@ $client->add_cb('on_chat_message', function($stanza) {
 	if((strlen($stanza->body) > 0) && ($from!='director_gnome@lawnalliance.org') && ($allowed!==FALSE)) {
 		// echo back the incoming message
 
-		$from=preg_replace('/@.*$/','',$from);
-		$message = "**** This was broadcast by " . $from . " ****\n";
-		$message .= $stanza->body;
-		$message = html_entity_decode($message, ENT_QUOTES, 'UTF-8');
-		$message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8',false);
-		$message = preg_replace('/(&nbsp;)*/', '', $message);
-		$message = preg_replace('/(&hellip;)*/', '', $message);
+		if (preg_match('/^\?OTR/',$stanza->body))
+		{
+			$message = "**** Turn off OTR you muppet ****\n";
+			$stanza->to = $from;
+		}
+		else
+		{
+			$from=preg_replace('/@.*$/','',$from);
+			$now = gmdate('Y-m-d H:i:s EVE');
+			$message = "**** This was broadcast by " . $from . " at " . $now . " ****\n\n";
+			$message .= $stanza->body;
+			$message = html_entity_decode($message, ENT_QUOTES, 'UTF-8');
+			$message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8',false);
+			$message = preg_replace('/(&nbsp;)*/', '', $message);
+			$message = preg_replace('/(&hellip;)*/', '', $message);
+			$stanza->to = 'all@broadcast.lawnalliance.org';
+		}
 		if (preg_match('/\*\*\*\* This was broadcast by (.*)? \*\*\*\*\n\\\\reconnect-dg$/',$message))
 		{
 			$client->end_stream();
 		}
 		else
 		{
-			$stanza->to = 'all@broadcast.lawnalliance.org';
 			$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->to, 'from'=>$stanza->from), $message);
 			$client->send($msg);
 		}		
