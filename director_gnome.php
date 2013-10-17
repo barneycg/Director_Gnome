@@ -103,13 +103,20 @@ $client->add_cb('on_chat_message', function($stanza) {
 		{
 			$from=preg_replace('/@.*$/','',$from);
 			$now = gmdate('Y-m-d H:i:s EVE');
+			list($group,$body) = explode("::",$stanza->body,2);
+			if (empty($body))
+			{
+				$body = $group;
+				$group="all";
+			}	
 			$message = "**** This was broadcast by " . $from . " at " . $now . " ****\n\n";
-			$message .= $stanza->body;
+			$message .= $body;
 			$message = html_entity_decode($message, ENT_QUOTES, 'UTF-8');
 			$message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8',false);
 			$message = preg_replace('/(&nbsp;)*/', '', $message);
 			$message = preg_replace('/(&hellip;)*/', '', $message);
-			$stanza->to = 'all@broadcast.lawnalliance.org';
+			$message .= "\n\n**** Message sent to the ".$group." Group ****\n";
+			$stanza->to = $group.'@broadcast.lawnalliance.org';
 		}
 		if (preg_match('/\*\*\*\* This was broadcast by (.*)? \*\*\*\*\n\\\\reconnect-dg$/',$message))
 		{
