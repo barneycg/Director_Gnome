@@ -94,16 +94,18 @@ $client->add_cb('on_chat_message', function($stanza) {
 		$groups_sql->execute(array(':un'=>$from));
 		$group_list = $groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
 		
-		$a_groups_sql = $pdo2->prepare('select groupName from of_broadcast_mapping where username = :un');
-		$a_groups_sql->execute(array(':un'=>$from));
-		$a_group_list = $a_groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
+		$u_groups_sql = $pdo2->prepare('select allowedGroup from of_user_bdcst_or where userName = :un');
+		$u_groups_sql->execute(array(':un'=>$from));
+		$u_group_list = $u_groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
 		
+		$gnl_ph = implode(',', array_fill(0, count($group_list), '?'));
+		$ag_groups_sql = $pdo2->prepare("select allowedGroup from of_group_bdcst_or where groupName IN ($gnl_ph)");
+		$ag_groups_sql->execute($group_list);
+		$ag_group_list = $ag_groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
+				
 		$ignore_sql = $pdo2->prepare('select username from of_broadcast_ignore where username = :un');
 		$ignore_sql->execute(array(':un'=>$from));
 		$ignore = $ignore_sql->fetchAll(PDO::FETCH_COLUMN, 0);
-		
-		$pdo = null;
-		$pdo2 = null;
 		
 		if (empty($ignore) && (array_search("alliance_officers",$group_list) || array_search("fc",$group_list) || array_search("hc",$group_list) ))
 		{
@@ -118,10 +120,12 @@ $client->add_cb('on_chat_message', function($stanza) {
 		{
 			list($group,$body) = explode("::",$stanza->body,2);
 
+			$hc_allowed=array_search("hc",$group_list);
 			$g_allowed=array_search($group,$group_list);
+			$u_allowed=array_search($group,$u_group_list);
+			$ag_allowed=array_search($group,$ag_group_list);
 			
-			$a_allowed=array_search("hc",$group_list) ? TRUE : array_search($group,$a_group_list);
-			if ($a_allowed!==FALSE)
+			if ($u_allowed!==FALSE)
 				$allowed = TRUE;
 		}
 		else
@@ -131,7 +135,7 @@ $client->add_cb('on_chat_message', function($stanza) {
 			$g_allowed = TRUE;
 		}
 
-		if($allowed!==FALSE && ($g_allowed!==FALSE || $a_allowed!==FALSE) ) 
+		if($allowed !== FALSE && ($hc_allowed !== FALSE || $g_allowed !== FALSE || $ag_allowed !== FALSE || $u_allowed !== FALSE )) 
 		{
 			// echo back the incoming message
 
@@ -168,7 +172,8 @@ $client->add_cb('on_chat_message', function($stanza) {
 				$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->to, 'from'=>$stanza->from), $message);
 				$client->send($msg);
 			}
-			if ($a_allowed !== FALSE)
+			
+			if ($u_allowed !== FALSE || $ag_allowed !== FALSE || $hc_allowed !== FALSE)
 			{
 				$message = "Message sent to the ".$group." group\n";
 				$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->from, 'from'=>$stanza->from), $message);
