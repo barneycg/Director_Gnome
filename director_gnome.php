@@ -79,54 +79,108 @@ $client->add_cb('on_auth_failure', function($reason) {
 });
 
 $client->add_cb('on_chat_message', function($stanza) {
-	global $client;
-	$client->get_roster();
-	$directors = $client->roster;
-        foreach($directors as $director) {
-		if (!empty($director->jid)){
-			$allowed_list[]=$director->jid;
-		}
-	}
+	global $client,$config;
+
 	$from=preg_replace('/\/.*$/', '', $stanza->from);
-
-	$allowed=array_search($from,$allowed_list);
-
-	if((strlen($stanza->body) > 0) && ($from!='director_gnome@lawnalliance.org') && ($allowed!==FALSE)) {
-		// echo back the incoming message
-
-		if (preg_match('/^\?OTR/',$stanza->body))
+	$from=preg_replace('/@.*$/','',$from);
+	
+	if (strlen($stanza->body)>0 && $from!='director_gnome')
+	{
+		$now = gmdate('Y-m-d H:i:s EVE');
+		$pdo = new PDO("mysql:host=".$config['mysql_openfire']['host'].";dbname=".$config['mysql_openfire']['db_name'], $config['mysql_openfire']['user'], $config['mysql_openfire']['password']);
+		$pdo2 = new PDO("mysql:host=".$config['mysql_misc']['host'].";dbname=".$config['mysql_misc']['db_name'], $config['mysql_misc']['user'], $config['mysql_misc']['password']);
+		
+		$groups_sql = $pdo->prepare('select groupName from ofGroupUser where username = :un');
+		$groups_sql->execute(array(':un'=>$from));
+		$group_list = $groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
+		
+		$a_groups_sql = $pdo2->prepare('select groupName from of_broadcast_mapping where username = :un');
+		$a_groups_sql->execute(array(':un'=>$from));
+		$a_group_list = $a_groups_sql->fetchAll(PDO::FETCH_COLUMN, 0);
+		
+		$ignore_sql = $pdo2->prepare('select username from of_broadcast_ignore where username = :un');
+		$ignore_sql->execute(array(':un'=>$from));
+		$ignore = $ignore_sql->fetchAll(PDO::FETCH_COLUMN, 0);
+		
+		$pdo = null;
+		$pdo2 = null;
+		
+		if (empty($ignore) && (array_search("alliance_officers",$group_list) || array_search("fc",$group_list) || array_search("hc",$group_list) ))
 		{
-			$message = "**** Turn off OTR you muppet ****\n";
-			$stanza->to = $from;
+			$allowed = TRUE;
 		}
 		else
 		{
-			$from=preg_replace('/@.*$/','',$from);
-			$now = gmdate('Y-m-d H:i:s EVE');
+			$allowed = FALSE;
+		}
+
+		if (preg_match("/::/",$stanza->body) != 0)
+		{
 			list($group,$body) = explode("::",$stanza->body,2);
-			if (empty($body))
-			{
-				$body = $group;
-				$group="all";
-			}	
-			$message = "**** This was broadcast by " . $from . " at " . $now . " ****\n\n";
-			$message .= $body;
-			$message = html_entity_decode($message, ENT_QUOTES, 'UTF-8');
-			$message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8',false);
-			$message = preg_replace('/(&nbsp;)*/', '', $message);
-			$message = preg_replace('/(&hellip;)*/', '', $message);
-			$message .= "\n\n**** Message sent to the ".$group." Group ****\n";
-			$stanza->to = $group.'@broadcast.lawnalliance.org';
-		}
-		if (preg_match('/\*\*\*\* This was broadcast by (.*)? \*\*\*\*\n\\\\reconnect-dg$/',$message))
-		{
-			$client->end_stream();
+
+			$g_allowed=array_search($group,$group_list);
+			
+			$a_allowed=array_search("hc",$group_list) ? TRUE : array_search($group,$a_group_list);
+			if ($a_allowed!==FALSE)
+				$allowed = TRUE;
 		}
 		else
 		{
-			$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->to, 'from'=>$stanza->from), $message);
+			$body = $stanza->body;
+			$group="all";
+			$g_allowed = TRUE;
+		}
+
+		if($allowed!==FALSE && ($g_allowed!==FALSE || $a_allowed!==FALSE) ) 
+		{
+			// echo back the incoming message
+
+			if (preg_match('/^\?OTR/',$stanza->body))
+			{
+				$message = "**** Turn off OTR you muppet ****\n";
+				$stanza->to = $from;
+			}
+			else
+			{
+				$from=preg_replace('/@.*$/','',$from);
+				$now = gmdate('Y-m-d H:i:s EVE');
+				list($group,$body) = explode("::",$stanza->body,2);
+				if (empty($body))
+				{
+					$body = $group;
+					$group="all";
+				}	
+				$message = "**** This was broadcast by " . $from . " at " . $now . " ****\n\n";
+				$message .= $body;
+				$message = html_entity_decode($message, ENT_QUOTES, 'UTF-8');
+				$message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8',false);
+				$message = preg_replace('/(&nbsp;)*/', '', $message);
+				$message = preg_replace('/(&hellip;)*/', '', $message);
+				$message .= "\n\n**** Message sent to the ".$group." Group ****\n";
+				$stanza->to = $group.'@broadcast.lawnalliance.org';
+			}
+			if (preg_match('/\*\*\*\* This was broadcast by (.*)? \*\*\*\*\n\\\\reconnect-dg$/',$message))
+			{
+				$client->end_stream();
+			}
+			else
+			{
+				$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->to, 'from'=>$stanza->from), $message);
+				$client->send($msg);
+			}
+			if ($a_allowed !== FALSE)
+			{
+				$message = "Message sent to the ".$group." group\n";
+				$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->from, 'from'=>$stanza->from), $message);
+				$client->send($msg);
+			}
+		}
+		else
+		{
+			$message = "Sorry you are not authorised to do that\n";
+			$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->from, 'from'=>$stanza->from), $message);
 			$client->send($msg);
-		}		
+		}
 	}
 });
 
