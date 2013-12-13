@@ -107,7 +107,7 @@ $client->add_cb('on_chat_message', function($stanza) {
 		$ignore_sql->execute(array(':un'=>$from));
 		$ignore = $ignore_sql->fetchAll(PDO::FETCH_COLUMN, 0);
 		
-		if (empty($ignore) && (array_search("alliance_officers",$group_list) || array_search("fc",$group_list) || array_search("hc",$group_list) ))
+		if (empty($ignore) && (array_search("alliance_officers",$group_list) || array_search("fcs",$group_list) || array_search("hc",$group_list) ))
 		{
 			$allowed = TRUE;
 		}
@@ -192,6 +192,20 @@ $client->add_cb('on_chat_message', function($stanza) {
 
 $client->add_cb('on_disconnect', function() {
 	echo "got on_disconnect cb\n";
+});
+
+$client->add_cb('on_presence_stanza', function($stanza) {
+	$now = date ( "c" );
+
+	$l = fopen("/home/barney/Director_Gnome/presence.log", "a");
+	
+	if ($stanza->type == "unavailable")
+		fwrite($l,"$now Offline - $stanza->from\n");
+	elseif ($stanza->show == NULL)
+		fwrite($l,"$now Online - $stanza->from - Online\n");
+	elseif ($stanza->show != NULL)
+		fwrite($l,"$now Online - $stanza->from - $stanza->show\n");
+	fclose($l);
 });
 
 // finally start configured xmpp stream
