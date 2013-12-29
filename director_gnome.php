@@ -169,7 +169,8 @@ $client->add_cb('on_chat_message', function($stanza) {
 			}
 			else
 			{
-				$msg = new XMPPMsg(array('type'=>'chat', 'to'=>$stanza->to, 'from'=>$stanza->from), $message);
+				$subject = "Broadcast to ". $group;
+				$msg = new XMPPMsg(array('type'=>'normal', 'to'=>$stanza->to, 'from'=>$stanza->from, 'subject'=>$subject), $message);
 				$client->send($msg);
 			}
 			
